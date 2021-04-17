@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
-
 class Server {
 public:
 	Server() {
@@ -18,16 +17,17 @@ public:
         addr.sin_port = htons(port);
 		addr.sin_family = AF_INET;
 
-		if (bind(sListen, (sockaddr*)&addr, sizeOfAddr) < 0) {
+		if (bind(sListen, reinterpret_cast<sockaddr*>(&addr), sizeOfAddr) < 0) {
 			std::cerr << "Error. Cant bind socket\n";
 			exit(1);
 		}
-
-		ClientHandler();
 	};
 	
 	~Server() {
+        shutdown(sListen,SHUT_RDWR);
 	};
+
+    void ClientHandler();
 
 private:
 	int sListen {0};
@@ -35,9 +35,6 @@ private:
     int sizeOfAddr = sizeof(addr);
     int port = 1111;
 
-
     bool Parse (char* msg, sockaddr_in client);
-	void ClientHandler();
 	bool SendMes(std::string msg, sockaddr_in client);
-	std::string FindPath (std::string str, bool& err);
 };

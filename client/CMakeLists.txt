@@ -8,4 +8,6 @@ include_directories(/home/karma/CLionProjects/json-develop/include)
 
 
 add_executable(Client
-        main.cpp)
+        main.cpp
+        client.cpp
+        client.h)

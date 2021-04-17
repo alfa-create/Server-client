@@ -15,8 +15,6 @@ public:
 			exit(1);
 		}
 
-		socklen_t size_serv_addr = sizeof(serv_addr);
-
 		serv_addr.sin_port = htons(1111);
 		serv_addr.sin_family = AF_INET;
 		serv_addr.sin_addr.s_addr = htonl(std::stoi(ip_serv));
@@ -26,20 +24,22 @@ public:
 		client_addr.sin_addr.s_addr = INADDR_ANY;
 		int size_client_addr = sizeof(client_addr);
 
-		int rc = bind(client_sock, (sockaddr*)&client_addr, size_client_addr);
+		int rc = bind(client_sock, reinterpret_cast<sockaddr*>(&client_addr),
+                size_client_addr);
+
 		if (rc < 0) {
 			std::cerr << "Error. Cant bind socket\n";
-			system("pause");
 			exit(1);
 		}
-		Test();
     };
-	~Client()= default;
+	~Client(){
+        shutdown(client_sock,SHUT_RDWR);
+    };
+    void Test();
 private:
 	std::string ip_serv = "0.0.0.0";
 	int client_sock{0};
     sockaddr_in serv_addr;
     sockaddr_in client_addr;
-    void Test();
     void SendMesToServ(nlohmann::json mes);
 };

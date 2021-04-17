@@ -1,17 +1,19 @@
-#include "Server.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <vector>
 #include <fstream>
+#include "Server.h"
 
 void Server::ClientHandler() {
     while (true) {
         char msg[256];
         sockaddr_in client_addr;
         socklen_t size_client_addr = sizeof(client_addr);
-        int received_bytes = recvfrom(sListen, (char*)msg, sizeof(msg), NULL,
-                                      (sockaddr*)&client_addr, &size_client_addr);
+
+        auto received_bytes = recvfrom(sListen, reinterpret_cast<char*> (msg), sizeof(msg), NULL,
+                reinterpret_cast<sockaddr*>(&client_addr), &size_client_addr);
+
         if (received_bytes <= 0)
             break;
         else{
@@ -51,49 +53,27 @@ bool Server::Parse(char* msg, sockaddr_in client) {
     try {
         nlohmann::json j = nlohmann::json::parse(msg);
         nlohmann::json answer;
-        std::string str = to_string(j);
-
 
         if (j.contains("ADD")) {
-            auto index = str.find('[');
-            if (index == std::string::npos ) return EXIT_FAILURE;
-            str.erase(0, index + 1);
             int result = 0;
+            std::vector<int> nums = j.at("ADD");
 
-            while (true) {
-                std::string str2;
-                index = str.find(',');
-                if (index == std::string::npos) {
-                    index = str.find(']');
-                    if (index == std::string::npos ) return EXIT_FAILURE;
-                    result += stoi(str2.assign(str, 0, index));
-                    break;
-                }
-
-                result += stoi(str2.assign(str, 0, index));
-                str.erase(0, index + 1);
+            for (auto &i : nums){
+                result+= i;
             }
             answer["ADD"] = result;
 
         } else if (j.contains("LIST")) {
-            bool err = false;
-            std::string path = FindPath(str,err);
-            if (err) return EXIT_FAILURE;
-
+            std:: string path = j.at("LIST");
             std::vector<std::string> files;
+
             for (const auto & entry : std::filesystem::directory_iterator(path)) {
-                std::string file = static_cast<std::string> (entry.path());
-                auto index = file.find_last_of('/');
-                if (index == std::string::npos ) return EXIT_FAILURE;
-                file.erase(0,index+1);
-                files.push_back(file);
+                files.push_back(std::filesystem::path(entry).filename());
             }
             answer["LIST"] = files;
 
         } else if (j.contains("CREATE")) {
-            bool err = false;
-            std::string path = FindPath(str,err);
-            if (err) return EXIT_FAILURE;
+            std:: string path = j.at("CREATE");
 
             std::ofstream file(path);
             if (!file ) return EXIT_FAILURE;
@@ -102,9 +82,7 @@ bool Server::Parse(char* msg, sockaddr_in client) {
             answer["CREATE"] = "SUCCESS";
 
         } else if (j.contains("REMOVE")) {
-            bool err = false;
-            std::string path = FindPath(str,err);
-            if (err) return EXIT_FAILURE;
+            std:: string path = j.at("REMOVE");
 
             if (remove(path.c_str())){
                 return EXIT_FAILURE;
@@ -112,9 +90,7 @@ bool Server::Parse(char* msg, sockaddr_in client) {
             answer["REMOVE"] = "SUCCESS";
 
         } else if (j.contains("READ")) {
-            bool err = false;
-            std::string path = FindPath(str,err);
-            if (err) return EXIT_FAILURE;
+            std:: string path = j.at("READ");
 
             std::ifstream file(path);
             if (!file ) return EXIT_FAILURE;
@@ -129,23 +105,14 @@ bool Server::Parse(char* msg, sockaddr_in client) {
             answer["READ"] = text;
 
         } else if (j.contains("WRITE")) {
-            auto index = str.find('[');
-            if (index == std::string::npos ) return EXIT_FAILURE;
-            str.erase(0, index + 2);
-            std:: string path = str;
-            index = str.find('"');
-            if (index == std::string::npos ) return EXIT_FAILURE;
-            path.erase(index, path.size()-1);
-            str.erase(0,index +3);
-            index = str.find('"');
-            if (index == std::string::npos ) return EXIT_FAILURE;
-            str.erase(index,str.size()-1);
 
-            std::ifstream file(path);
+            std::vector<std::string> vec = j.at("WRITE");
+
+            std::ifstream file(vec[0]);
             if (!file ) return EXIT_FAILURE;
             file.close();
-            std::ofstream file2(path);
-            file2<<str;
+            std::ofstream file2(vec[0]);
+            file2<<vec[1];
             file2.close();
 
             answer["WRITE"] = "SUCCESS";
@@ -169,30 +136,12 @@ bool Server::SendMes(std::string msg, sockaddr_in client) {
 
     int size_client = sizeof(client);
 
-    int send_mes = sendto(sListen, (char*)mes, sizeof(mes), NULL,
-                          (sockaddr*)&client, size_client);
+    auto send_mes = sendto(sListen, reinterpret_cast<char*>(mes), sizeof(mes), NULL,
+                          reinterpret_cast<sockaddr*>(&client), size_client);
 
     if (send_mes != sizeof(mes)) {
         std::cerr << "failed to send packet";
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
-}
-
-std::string Server::FindPath(std::string str, bool& err) {
-    std::string path = std::move(str);
-    auto index = path.find(':');
-    if (index == std::string::npos ) {
-        err = true;
-        return str;
-    }
-    path.erase(0,index +2);
-    index = path.find('"');
-    if (index == std::string::npos ) {
-        err = true;
-        return str;
-    }
-    path.erase(index,path.size()-1);
-
-    return path;
 }

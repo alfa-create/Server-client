@@ -1,9 +1,10 @@
 #include <iostream>
 
-#include "client.cpp"
+#include "client.h"
 
 int main() {
 	Client cl;
+	cl.Test();
 	return 0;
 
 }
